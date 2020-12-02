@@ -5,6 +5,10 @@ with open('README.md', 'r') as f:
     long_description = f.read()
 
 
+with open('./requirements.txt', 'r') as f:
+    packages = f.read().split('\n')
+
+
 setuptools.setup(
     name="firestore-collections",
     version="0.0.1",
@@ -14,7 +18,7 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/LasseRegin/firestore-collections",
-    packages=setuptools.find_packages(),
+    packages=packages,
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
