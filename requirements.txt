@@ -1,0 +1,3 @@
+bson>=0.5.10
+firebase-admin>=4.4.0
+pydantic[email]>=1.7.3
