@@ -3,6 +3,8 @@
 
 Simple Firestore collection definitions and queries using pydantic schemas and Firestore query API.
 
+A quick and easy way to make sure of the NoSQL document database solution [Firestore](https://cloud.google.com/firestore) available in Google Cloud Platform.
+
 ## Requirements
 
 * Python 3.6+
