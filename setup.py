@@ -1,11 +1,15 @@
+import os
 import setuptools
 
 
-with open('README.md', 'r') as f:
+DIR = os.path.dirname(os.path.realpath(__file__))
+
+
+with open(os.path.join(DIR, 'README.md'), 'r') as f:
     long_description = f.read()
 
 
-with open('./requirements.txt', 'r', encoding='utf-8') as f:
+with open(os.path.join(DIR, 'requirements.txt'), 'r', encoding='utf-8') as f:
     packages = f.read().split('\n')
 
 
