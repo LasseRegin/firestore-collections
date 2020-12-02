@@ -3,11 +3,12 @@
 
 Simple Firestore collection definitions and queries using pydantic schemas and Firestore query API.
 
-A quick and easy way to make use of the NoSQL document database solution [Firestore](https://cloud.google.com/firestore) available in Google Cloud Platform.
+A quick and easy way to make use of the NoSQL document database solution [Firestore](https://cloud.google.com/firestore) available in Google Cloud Platform (GCP).
 
 ## Requirements
 
 * Python 3.6+
+* GCP project with Firestore enabled
 
 ## Features
 
@@ -61,6 +62,10 @@ users = collection.get_all()
 # Delete object
 collection.delete(id=user.id)
 ```
+
+## GCP credentials
+
+**NOTE**: The package assumes a valid GCP credentials file is available and its path defined in the environment variable `GOOGLE_APPLICATION_CREDENTIALS`.
 
 ## License
 
