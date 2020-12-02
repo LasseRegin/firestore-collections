@@ -15,7 +15,7 @@ with open(os.path.join(DIR, 'requirements.txt'), 'r', encoding='utf-8') as f:
 
 setuptools.setup(
     name="firestore-collections",
-    version="0.0.2",
+    version="0.0.3",
     author="Lasse Regin Nielsen",
     author_email="lasseregin@gmail.com",
     description="Simple Firestore collection definitions and queries using pydantic schemas and Firestore query API.",
