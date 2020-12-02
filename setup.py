@@ -5,17 +5,17 @@ import setuptools
 DIR = os.path.dirname(os.path.realpath(__file__))
 
 
-with open(os.path.join(DIR, 'README.md'), 'r') as f:
+with open(os.path.join(DIR, "README.md"), "r") as f:
     long_description = f.read()
 
 
-with open(os.path.join(DIR, 'requirements.txt'), 'r', encoding='utf-8') as f:
-    packages = f.read().split('\n')
+with open(os.path.join(DIR, "requirements.txt"), "r") as f:
+    packages = f.read().split("\n")
 
 
 setuptools.setup(
     name="firestore-collections",
-    version="0.0.3",
+    version="0.0.4",
     author="Lasse Regin Nielsen",
     author_email="lasseregin@gmail.com",
     description="Simple Firestore collection definitions and queries using pydantic schemas and Firestore query API.",
@@ -29,5 +29,10 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    python_requires='>=3.6',
+    python_requires=">=3.6",
+    package_data={"": [
+        "LICENSE",
+        "requirements.txt"
+    ]},
+    include_package_data=True,
 )
