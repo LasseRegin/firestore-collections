@@ -144,6 +144,24 @@ class Collection:
             limit=limit,
             order_by=order_by)
 
+    def query_by_attributes(self,
+                            attributes: List[str],
+                            values: List[Any],
+                            operator: Optional[str] = u'==',
+                            limit: Optional[int] = None,
+                            order_by: Optional[List[Tuple[str, OrderByDirection]]] = []
+                            ) -> List[Any]:
+        if len(attributes) != len(values):
+            raise ValueError('Number af attributes and values provided must be equal')
+
+        return self._query(
+            conditions=[
+                (attribute, operator, value)
+                for attribute, value in zip(attributes, values)
+            ],
+            limit=limit,
+            order_by=order_by)
+
     def update(self, doc: Union[BaseModel, dict]) -> None:
         if isinstance(doc, BaseModel) and not isinstance(doc, self.schema):
             raise ValueError(f"Invalid schema used for provided document: {doc}")
