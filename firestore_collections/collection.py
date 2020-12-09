@@ -67,7 +67,9 @@ class Collection:
                     limit=limit,
                     order_by=order_by)
         if len(unique_operators) > 1:
-            raise ValueError('Cannot have different operators in same query')
+            allowed_mixed_operators = {'>=', '<=', '==', '>', '<'}
+            if len(set(unique_operators) - allowed_mixed_operators) != 0:
+                raise ValueError(f"Only following operators can be mixed: {allowed_mixed_operators}")
 
         # Init docs object
         docs = self.collection
