@@ -147,7 +147,7 @@ class Collection:
     def query_by_attributes(self,
                             attributes: List[str],
                             values: List[Any],
-                            operator: Optional[str] = u'==',
+                            operators: List[str],
                             limit: Optional[int] = None,
                             order_by: Optional[List[Tuple[str, OrderByDirection]]] = []
                             ) -> List[Any]:
@@ -157,7 +157,7 @@ class Collection:
         return self._query(
             conditions=[
                 (attribute, operator, value)
-                for attribute, value in zip(attributes, values)
+                for attribute, operator, value in zip(attributes, operators, values)
             ],
             limit=limit,
             order_by=order_by)
