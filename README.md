@@ -29,6 +29,7 @@ from firestore_collections import Collection, Schema
 
 class User(Schema):
     __collection_name__ = 'users'
+    __unique_keys__ = ['email']
 
     email: EmailStr
     full_name: str = None

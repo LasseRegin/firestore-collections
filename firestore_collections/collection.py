@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Any, List, Union, Tuple, Optional
 
 from bson import ObjectId
-from firebase_admin.exceptions import NotFoundError, ALREADY_EXISTS
+from firebase_admin.exceptions import NotFoundError, ALREADY_EXISTS, ConflictError
 from google.cloud.firestore_v1.collection import CollectionReference
 from pydantic import BaseModel
 
@@ -18,6 +18,13 @@ class Collection:
 
         if self.collection_name is None:
             raise ValueError('`__collection_name__` has not been defined')
+
+    @property
+    def name(self):
+        return self.schema.__name__
+
+    def get_unique_keys(self):
+        return getattr(self.schema, '__unique_keys__', [])
 
     @property
     def collection(self) -> CollectionReference:
@@ -174,6 +181,9 @@ class Collection:
         if doc.id is None:
             raise ValueError(f"Provided document has not id: {doc}")
 
+        # Check for any restrictions
+        self._check_restrictions(doc=doc, is_update=True)
+
         # Set updated date
         doc.updated_at = datetime.utcnow()
 
@@ -198,6 +208,9 @@ class Collection:
         # Set created date
         doc.created_at = datetime.utcnow()
 
+        # Check for any restrictions
+        self._check_restrictions(doc=doc, is_update=False)
+
         # Convert from schema to dictionary
         doc = parse_document_to_dict(doc=doc)
 
@@ -219,3 +232,19 @@ class Collection:
 
     def delete(self, id: str) -> None:
         self.collection.document(id).delete()
+
+    def _check_restrictions(self, doc: BaseModel, is_update: bool = False):
+        # Check for any restrictions
+        for key in self.get_unique_keys():
+            value = getattr(doc, key)
+            try:
+                doc_db = self.get_by_attribute(key, value)
+
+                # If the clashing document is itself the allow clash
+                if is_update and doc.id == doc_db.id:
+                    continue
+
+                raise ConflictError(f"{self.name} with {key} {value} already exists")
+            except NotFoundError:
+                # No document with given unique key found
+                pass
