@@ -4,20 +4,26 @@ from typing import Any, List, Union, Tuple, Optional
 from bson import ObjectId
 from google.api_core.exceptions import NotFound, AlreadyExists, Conflict
 from google.cloud.firestore_v1.collection import CollectionReference
+from google.cloud.firestore import Client
 from pydantic import BaseModel
 
-from firestore_collections.client import client
 from firestore_collections.enums import OrderByDirection
 from firestore_collections.utils import chunks, parse_document_to_dict
 
 
 class Collection:
-    def __init__(self, schema: BaseModel):
+    def __init__(self, schema: BaseModel, firestore_client: Optional[Client] = None):
         self.schema = schema
         self.collection_name = schema.__collection_name__
 
         if self.collection_name is None:
             raise ValueError('`__collection_name__` has not been defined')
+
+        if firestore_client is None:
+            from firestore_collections.client import client
+            self._client = client
+        else:
+            self._client = firestore_client
 
     @property
     def name(self):
@@ -28,7 +34,7 @@ class Collection:
 
     @property
     def collection(self) -> CollectionReference:
-        return client.collection(self.collection_name)
+        return self._client.collection(self.collection_name)
 
     def get(self, id: str) -> Any:
         doc_ref = self.collection.document(id)
