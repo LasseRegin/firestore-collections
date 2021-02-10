@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Any, List, Union, Tuple, Optional
 
 from bson import ObjectId
-from firebase_admin.exceptions import NotFoundError, ALREADY_EXISTS, ConflictError
+from google.api_core.exceptions import NotFound, AlreadyExists, Conflict
 from google.cloud.firestore_v1.collection import CollectionReference
 from pydantic import BaseModel
 
@@ -35,7 +35,7 @@ class Collection:
         doc = doc_ref.get()
 
         if not doc.exists:
-            raise NotFoundError(f"Document {self.collection_name}.{id} could not be found")
+            raise NotFound(f"Document {self.collection_name}.{id} could not be found")
 
         return self.schema(**{**doc.to_dict(), 'id': doc.id})
 
@@ -48,7 +48,7 @@ class Collection:
     def get_by_attribute(self, attribute: str, value: Any) -> Any:
         docs = self.query_by_attribute(attribute=attribute, value=value)
         if len(docs) == 0:
-            raise NotFoundError(f"Document could not be found in {self.collection_name} with `{attribute}=={value}`")
+            raise NotFound(f"Document could not be found in {self.collection_name} with `{attribute}=={value}`")
 
         return docs[0]
 
@@ -221,7 +221,7 @@ class Collection:
         else:
             # Check if document already exists
             if self.collection.document(new_id).get().exists:
-                raise ALREADY_EXISTS(f"{self.schema.__name__} already exists with ID: {new_id}")
+                raise AlreadyExists(f"{self.schema.__name__} already exists with ID: {new_id}")
         doc_ref = self.collection.document(new_id)
         doc_ref.set(doc)
 
@@ -244,7 +244,7 @@ class Collection:
                 if is_update and doc.id == doc_db.id:
                     continue
 
-                raise ConflictError(f"{self.name} with {key} {value} already exists")
-            except NotFoundError:
+                raise Conflict(f"{self.name} with {key} {value} already exists")
+            except NotFound:
                 # No document with given unique key found
                 pass
