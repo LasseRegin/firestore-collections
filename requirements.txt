@@ -1,3 +1,4 @@
+idna==2.10  # Added to prevent dependency clash with `requests`
 bson>=0.5.10
 google-cloud-firestore>=2.0.2
 pydantic[email]>=1.7.3
