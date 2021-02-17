@@ -8,6 +8,7 @@ from google.cloud.firestore import Client
 from pydantic import BaseModel
 
 from firestore_collections.enums import OrderByDirection
+from firestore_collections.schema import SchemaWithOwner
 from firestore_collections.utils import chunks, parse_document_to_dict
 
 
@@ -177,7 +178,9 @@ class Collection:
             limit=limit,
             order_by=order_by)
 
-    def update(self, doc: Union[BaseModel, dict]) -> None:
+    def update(self,
+               doc: Union[BaseModel, dict],
+               owner: Optional[str] = None) -> None:
         if isinstance(doc, BaseModel) and not isinstance(doc, self.schema):
             raise ValueError(f"Invalid schema used for provided document: {doc}")
 
@@ -193,6 +196,9 @@ class Collection:
         # Set updated date
         doc.updated_at = datetime.utcnow()
 
+        if isinstance(doc, SchemaWithOwner):
+            doc.updated_by = owner
+
         # Convert from schema to dictionary
         doc_id = doc.id
         doc = parse_document_to_dict(doc=doc)
@@ -204,7 +210,9 @@ class Collection:
         # to avoid overwriting entire documents.
         doc_ref.set(doc, merge=True)
 
-    def insert(self, doc: Union[BaseModel, dict]) -> BaseModel:
+    def insert(self,
+               doc: Union[BaseModel, dict],
+               owner: Optional[str] = None) -> BaseModel:
         if isinstance(doc, BaseModel) and not isinstance(doc, self.schema):
             raise ValueError(f"Invalid schema used for provided document: {doc}")
 
@@ -213,6 +221,9 @@ class Collection:
 
         # Set created date
         doc.created_at = datetime.utcnow()
+
+        if isinstance(doc, SchemaWithOwner):
+            doc.created_by = owner
 
         # Check for any restrictions
         self._check_restrictions(doc=doc, is_update=False)
