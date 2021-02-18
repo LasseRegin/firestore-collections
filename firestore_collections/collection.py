@@ -1,3 +1,4 @@
+from collections import Counter
 from datetime import datetime
 from typing import Any, List, Union, Tuple, Optional
 
@@ -13,7 +14,9 @@ from firestore_collections.utils import chunks, parse_document_to_dict
 
 
 class Collection:
-    def __init__(self, schema: BaseModel, firestore_client: Optional[Client] = None):
+    def __init__(self,
+                 schema: BaseModel,
+                 firestore_client: Optional[Client] = None):
         self.schema = schema
         self.collection_name = schema.__collection_name__
 
@@ -65,21 +68,28 @@ class Collection:
                order_by: Optional[List[Tuple[str, OrderByDirection]]] = []
                ) -> List[Any]:
         # Sanity checks
+        conditions = list(conditions)
         operators = [x[1].lower() for x in conditions]
-        unique_operators = list(set(operators))
-        if u'in' in operators and len(operators) > 1:
-            raise ValueError('Using `in` operator cannot have multiple conditions')
-        if len(unique_operators) == 1:
-            operator = unique_operators[0]
-            if len(operators) > 1 and operator != u'==':
-                raise ValueError('Can only have multiple operators with operator `==`')
-            if operator == 'in':
-                attribute, operator, values = conditions[0]
-                return self._query_in(
-                    attribute=attribute,
-                    values=values,
-                    limit=limit,
-                    order_by=order_by)
+        operator_counts = Counter(operators)
+        unique_operators = list(operator_counts.keys())
+        in_operator_count = operator_counts.get(u'in', 0)
+
+        if in_operator_count > 1:
+            raise ValueError('Cannot use more than one `in` operator in conditions')
+
+        if in_operator_count == 1:
+            in_operator_idx = operators.index(u'in')
+            in_condition = conditions.pop(in_operator_idx)
+            attribute, _, values = in_condition
+            return self._query_in(
+                attribute=attribute,
+                values=values,
+                limit=limit,
+                additional_attributes=[x[0] for x in conditions],
+                additional_values=[x[2] for x in conditions],
+                additional_operator=[x[1] for x in conditions],
+                order_by=order_by)
+
         if len(unique_operators) > 1:
             allowed_mixed_operators = {u'>=', u'<=', u'==', u'>', u'<', u'in'}
             if len(set(unique_operators) - allowed_mixed_operators) != 0:
@@ -113,6 +123,9 @@ class Collection:
     def _query_in(self,
                   attribute: str,
                   values: Any,
+                  additional_attributes: Optional[List[str]] = [],
+                  additional_values: Optional[List[Any]] = [],
+                  additional_operator: Optional[List[str]] = [],
                   limit: Optional[int] = None,
                   order_by: Optional[List[Tuple[str, OrderByDirection]]] = []
                   ) -> List[Any]:
@@ -127,6 +140,11 @@ class Collection:
         if len(order_by) > 0:
             raise NotImplementedError('`order_by` has not been implemented yet')
 
+        if len(additional_attributes) != len(additional_values):
+            raise ValueError('Size of `additional_attributes` and `additional_values` must match')
+        if len(additional_values) != len(additional_operator):
+            raise ValueError('Size of `additional_values` and `additional_operator` must match')
+
         docs_all = []
         for values in values_lists:
             # Init docs object
@@ -134,6 +152,13 @@ class Collection:
 
             # Add conditions (where clauses)
             docs = docs.where(attribute, u'in', values)
+
+            for _attribute, _value, _operator in zip(
+                additional_attributes,
+                additional_values,
+                additional_operator,
+            ):
+                docs = docs.where(_attribute, _operator, _value)
 
             # Limit result if provided
             if limit:
