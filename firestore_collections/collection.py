@@ -16,9 +16,11 @@ from firestore_collections.utils import chunks, parse_document_to_dict
 class Collection:
     def __init__(self,
                  schema: BaseModel,
-                 firestore_client: Optional[Client] = None):
+                 firestore_client: Optional[Client] = None,
+                 force_ownership: Optional[bool] = False):
         self.schema = schema
         self.collection_name = schema.__collection_name__
+        self.force_ownership = force_ownership
 
         if self.collection_name is None:
             raise ValueError('`__collection_name__` has not been defined')
@@ -222,6 +224,8 @@ class Collection:
         doc.updated_at = datetime.utcnow()
 
         if isinstance(doc, SchemaWithOwner):
+            if owner is None and self.force_ownership:
+                raise ValueError(f"An `owner` must be defined for collection {self.name}")
             doc.updated_by = owner
 
         # Convert from schema to dictionary
@@ -248,6 +252,8 @@ class Collection:
         doc.created_at = datetime.utcnow()
 
         if isinstance(doc, SchemaWithOwner):
+            if owner is None and self.force_ownership:
+                raise ValueError(f"An `owner` must be defined for collection {self.name}")
             doc.created_by = owner
 
         # Check for any restrictions
@@ -274,12 +280,16 @@ class Collection:
 
     def delete(self, id: str, owner: Optional[str] = None) -> None:
         # Set updated by and time before deleting to trigger change
-        if owner is not None and issubclass(self.schema, SchemaWithOwner):
-            self.collection.document(id).set({
-                'updated_at': datetime.utcnow(),
-                'updated_by': owner,
-                'deleted': True,
-            }, merge=True)
+        if issubclass(self.schema, SchemaWithOwner):
+            if owner is None and self.force_ownership:
+                raise ValueError(f"An `owner` must be defined for collection {self.name}")
+
+            if owner is not None:
+                self.collection.document(id).set({
+                    'updated_at': datetime.utcnow(),
+                    'updated_by': owner,
+                    'deleted': True,
+                }, merge=True)
 
         self.collection.document(id).delete()
 
