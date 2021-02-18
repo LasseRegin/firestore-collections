@@ -241,7 +241,8 @@ class Collection:
 
     def insert(self,
                doc: Union[BaseModel, dict],
-               owner: Optional[str] = None) -> BaseModel:
+               owner: Optional[str] = None,
+               force: Optional[bool] = False) -> BaseModel:
         if isinstance(doc, BaseModel) and not isinstance(doc, self.schema):
             raise ValueError(f"Invalid schema used for provided document: {doc}")
 
@@ -252,7 +253,7 @@ class Collection:
         doc.created_at = datetime.utcnow()
 
         if isinstance(doc, SchemaWithOwner):
-            if owner is None and self.force_ownership:
+            if not force and (owner is None and self.force_ownership):
                 raise ValueError(f"An `owner` must be defined for collection {self.name}")
             doc.created_by = owner
 
