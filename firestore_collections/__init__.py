@@ -1,3 +1,9 @@
+from google.api_core.exceptions import (
+    AlreadyExists,
+    Conflict,
+    NotFound,
+)
+
 from firestore_collections.collection import Collection
 from firestore_collections.enums import (
     FirestoreTimestamp,
@@ -10,8 +16,11 @@ from firestore_collections.schema import (
 
 
 __all__ = [
+    'AlreadyExists',
     'Collection',
+    'Conflict',
     'FirestoreTimestamp',
+    'NotFound',
     'OrderByDirection',
     'Schema',
     'SchemaWithOwner',
