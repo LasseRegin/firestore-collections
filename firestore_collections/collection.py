@@ -272,7 +272,15 @@ class Collection:
 
         return self.schema(**{**doc.to_dict(), 'id': doc.id})
 
-    def delete(self, id: str) -> None:
+    def delete(self, id: str, owner: Optional[str] = None) -> None:
+        # Set updated by and time before deleting to trigger change
+        if owner is not None and issubclass(self.schema, SchemaWithOwner):
+            self.collection.document(id).set({
+                'updated_at': datetime.utcnow(),
+                'updated_by': owner,
+                'deleted': True,
+            }, merge=True)
+
         self.collection.document(id).delete()
 
     def _check_restrictions(self, doc: BaseModel, is_update: bool = False):
