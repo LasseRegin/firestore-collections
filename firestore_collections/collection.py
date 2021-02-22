@@ -207,7 +207,8 @@ class Collection:
 
     def update(self,
                doc: Union[BaseModel, dict],
-               owner: Optional[str] = None) -> None:
+               owner: Optional[str] = None,
+               force: Optional[bool] = False) -> None:
         if isinstance(doc, BaseModel) and not isinstance(doc, self.schema):
             raise ValueError(f"Invalid schema used for provided document: {doc}")
 
@@ -224,7 +225,7 @@ class Collection:
         doc.updated_at = datetime.utcnow()
 
         if isinstance(doc, SchemaWithOwner):
-            if owner is None and self.force_ownership:
+            if not force and (owner is None and self.force_ownership):
                 raise ValueError(f"An `owner` must be defined for collection {self.name}")
             doc.updated_by = owner
 
