@@ -238,6 +238,8 @@ class Collection:
 
         # The `merge` mergeds the new data with any existing document
         # to avoid overwriting entire documents.
+        # TODO: Use `doc_ref.update(...)` instead
+        # See https://googleapis.dev/python/firestore/latest/document.html?highlight=update#google.cloud.firestore_v1.document.DocumentReference.update
         doc_ref.set(doc, merge=True)
 
     def insert(self,
@@ -280,10 +282,13 @@ class Collection:
 
         return self.schema(**{**doc.to_dict(), 'id': doc.id})
 
-    def delete(self, id: str, owner: Optional[str] = None) -> None:
+    def delete(self,
+               id: str,
+               owner: Optional[str] = None,
+               force: Optional[bool] = False) -> None:
         # Set updated by and time before deleting to trigger change
         if issubclass(self.schema, SchemaWithOwner):
-            if owner is None and self.force_ownership:
+            if not force and (owner is None and self.force_ownership):
                 raise ValueError(f"An `owner` must be defined for collection {self.name}")
 
             if owner is not None:
