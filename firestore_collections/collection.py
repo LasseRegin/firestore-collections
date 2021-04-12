@@ -332,7 +332,9 @@ class Collection:
         new_id = doc.pop('id', None)
         if new_id is None:
             new_id = str(ObjectId())
-        doc = self.collection.document(new_id).create(doc)
+        doc_ref = self.collection.document(new_id)
+        doc_ref.create(doc)
+        doc = doc_ref.get()
 
         return self.schema(**{**doc.to_dict(), 'id': doc.id})
 
