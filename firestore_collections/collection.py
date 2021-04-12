@@ -5,6 +5,7 @@ from typing import Any, List, Union, Tuple, Optional
 from bson import ObjectId
 from google.api_core.datetime_helpers import DatetimeWithNanoseconds
 from google.api_core.exceptions import NotFound, AlreadyExists, Conflict
+from google.cloud.firestore_v1.batch import WriteBatch
 from google.cloud.firestore_v1.collection import CollectionReference
 from google.cloud.firestore import Client
 from pydantic import BaseModel
@@ -217,7 +218,8 @@ class Collection:
     def update(self,
                doc: Union[BaseModel, dict],
                owner: Optional[str] = None,
-               force: Optional[bool] = False) -> None:
+               force: Optional[bool] = False,
+               dry_run: Optional[bool] = False) -> None:
         if isinstance(doc, BaseModel) and not isinstance(doc, self.schema):
             raise ValueError(f"Invalid schema used for provided document: {doc}")
 
@@ -242,6 +244,9 @@ class Collection:
         doc_id = doc.id
         doc = parse_document_to_dict(doc=doc)
 
+        if dry_run:
+            return doc
+
         # Get document reference
         doc_ref = self.collection.document(doc_id)
 
@@ -251,10 +256,55 @@ class Collection:
         # See https://googleapis.dev/python/firestore/latest/document.html?highlight=update#google.cloud.firestore_v1.document.DocumentReference.update
         doc_ref.set(doc, merge=True)
 
+    def bulk_update(self,
+                    docs: List[Union[BaseModel, dict]],
+                    owner: Optional[str] = None,
+                    force: Optional[bool] = False,
+                    merge: Optional[bool] = False,
+                    batch_size: Optional[int] = 500) -> None:
+        if batch_size <= 0:
+            raise ValueError('`batch_size` must be larger than 0')
+        if len(docs) == 0:
+            raise ValueError('No documents provided')
+
+        # Parse all docs to dicts
+        docs = [
+            self.update(
+               doc=doc,
+               owner=owner,
+               force=force,
+               dry_run=True,
+            )
+            for doc in docs
+        ]
+
+        # Define batch operation
+        write_batch = WriteBatch(client=self._client)
+
+        for i, doc in enumerate(docs):
+            doc_id = doc.pop('id', None)
+            if doc_id is None:
+                doc_id = str(ObjectId())
+
+            write_batch.set(
+                reference=self.collection.document(doc_id),
+                document_data=doc,
+                merge=merge)
+
+            if (i + 1) % batch_size == 0:
+                # Execute batch operation
+                write_batch.commit()
+                write_batch = WriteBatch(client=self._client)
+
+        if (i + 1) % batch_size != 0:
+            # Execute batch operation
+            write_batch.commit()
+
     def insert(self,
                doc: Union[BaseModel, dict],
                owner: Optional[str] = None,
-               force: Optional[bool] = False) -> BaseModel:
+               force: Optional[bool] = False,
+               dry_run: Optional[bool] = False) -> BaseModel:
         if isinstance(doc, BaseModel) and not isinstance(doc, self.schema):
             raise ValueError(f"Invalid schema used for provided document: {doc}")
 
@@ -275,21 +325,58 @@ class Collection:
         # Convert from schema to dictionary
         doc = parse_document_to_dict(doc=doc)
 
+        if dry_run:
+            return doc
+
         # Insert new document
         new_id = doc.pop('id', None)
         if new_id is None:
             new_id = str(ObjectId())
-        else:
-            # Check if document already exists
-            if self.collection.document(new_id).get().exists:
-                raise AlreadyExists(f"{self.schema.__name__} already exists with ID: {new_id}")
-        doc_ref = self.collection.document(new_id)
-        doc_ref.set(doc)
-
-        # Retrieve document snapshot
-        doc = doc_ref.get()
+        doc = self.collection.document(new_id).create(doc)
 
         return self.schema(**{**doc.to_dict(), 'id': doc.id})
+
+    def bulk_insert(self,
+                    docs: List[Union[BaseModel, dict]],
+                    owner: Optional[str] = None,
+                    force: Optional[bool] = False,
+                    batch_size: Optional[int] = 500) -> None:
+        if batch_size <= 0:
+            raise ValueError('`batch_size` must be larger than 0')
+        if len(docs) == 0:
+            raise ValueError('No documents provided')
+
+        # Parse all docs to dicts
+        docs = [
+            self.insert(
+               doc=doc,
+               owner=owner,
+               force=force,
+               dry_run=True,
+            )
+            for doc in docs
+        ]
+
+        # Define batch operation
+        write_batch = WriteBatch(client=self._client)
+
+        for i, doc in enumerate(docs):
+            doc_id = doc.pop('id', None)
+            if doc_id is None:
+                doc_id = str(ObjectId())
+
+            write_batch.create(
+                reference=self.collection.document(doc_id),
+                document_data=doc)
+
+            if (i + 1) % batch_size == 0:
+                # Execute batch operation
+                write_batch.commit()
+                write_batch = WriteBatch(client=self._client)
+
+        if (i + 1) % batch_size != 0:
+            # Execute batch operation
+            write_batch.commit()
 
     def delete(self,
                id: str,
@@ -308,6 +395,50 @@ class Collection:
                 }, merge=True)
 
         self.collection.document(id).delete()
+
+    def bulk_delete(self,
+                    doc_ids: List[str],
+                    owner: Optional[str] = None,
+                    force: Optional[bool] = False,
+                    batch_size: Optional[int] = 500) -> None:
+        if batch_size <= 0:
+            raise ValueError('`batch_size` must be larger than 0')
+        if len(doc_ids) == 0:
+            raise ValueError('No document IDs provided')
+
+        # Set updated by and time before deleting to trigger change
+        update_before_delete = False
+        if issubclass(self.schema, SchemaWithOwner):
+            if not force and (owner is None and self.force_ownership):
+                raise ValueError(f"An `owner` must be defined for collection {self.name}")
+
+            if owner is not None:
+                update_before_delete = True
+
+        # Define batch operation
+        write_batch = WriteBatch(client=self._client)
+
+        for i, doc_id in enumerate(doc_ids):
+            if update_before_delete:
+                write_batch.set(
+                    reference=self.collection.document(doc_id),
+                    document_data={
+                        'updated_at': datetime.utcnow(),
+                        'updated_by': owner,
+                        'deleted': True,
+                    },
+                    merge=True)
+
+            write_batch.delete(reference=self.collection.document(doc_id))
+
+            if (i + 1) % batch_size == 0:
+                # Execute batch operation
+                write_batch.commit()
+                write_batch = WriteBatch(client=self._client)
+
+        if (i + 1) % batch_size != 0:
+            # Execute batch operation
+            write_batch.commit()
 
     def _check_restrictions(self, doc: BaseModel, is_update: bool = False):
         # Check for any restrictions
