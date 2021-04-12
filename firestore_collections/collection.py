@@ -31,6 +31,12 @@ class Collection:
         else:
             self._client = firestore_client
 
+        if issubclass(self.schema, BaseModel):
+            schema_pydantic = self.schema.schema()
+            self.schema_props = schema_pydantic.get('properties', {})
+        else:
+            self.schema_props = None
+
     @property
     def name(self):
         return self.schema.__name__
@@ -69,8 +75,10 @@ class Collection:
                limit: Optional[int] = None,
                order_by: Optional[List[Tuple[str, OrderByDirection]]] = []
                ) -> List[Any]:
+        # Parse condition values based on attribute type
+        conditions = self._parse_conditions(conditions)
+
         # Sanity checks
-        conditions = list(conditions)
         operators = [x[1].lower() for x in conditions]
         operator_counts = Counter(operators)
         unique_operators = list(operator_counts.keys())
@@ -315,3 +323,24 @@ class Collection:
             except NotFound:
                 # No document with given unique key found
                 pass
+
+    def _parse_conditions(self, conditions: List[Tuple[str, str, Any]]) -> List[Tuple[str, str, Any]]:
+        conditions = list(conditions)
+        conditions_parsed = []
+        if self.schema_props is not None:
+            for attribute, operator, value in conditions:
+                attr_props = self.schema_props.get(attribute, {})
+                any_of = attr_props.get('anyOf', [])
+
+                # Check if schema is a datetime
+                if any((
+                    x.get('format') == 'date-time'
+                    for x in any_of
+                )):
+                    if type(value) == str:
+                        try:
+                            value = datetime.fromisoformat(value)
+                        except ValueError:
+                            pass
+                conditions_parsed.append((attribute, operator, value))
+        return conditions_parsed
