@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Any, List, Union, Tuple, Optional
 
 from bson import ObjectId
+from google.api_core.datetime_helpers import DatetimeWithNanoseconds
 from google.api_core.exceptions import NotFound, AlreadyExists, Conflict
 from google.cloud.firestore_v1.collection import CollectionReference
 from google.cloud.firestore import Client
@@ -339,7 +340,7 @@ class Collection:
                 )):
                     if type(value) == str:
                         try:
-                            value = datetime.fromisoformat(value)
+                            value = DatetimeWithNanoseconds.fromisoformat(value)
                         except ValueError:
                             pass
                 conditions_parsed.append((attribute, operator, value))
