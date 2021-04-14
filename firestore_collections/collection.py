@@ -1,6 +1,6 @@
 from collections import Counter
 from datetime import datetime
-from typing import Any, List, Union, Tuple, Optional
+from typing import Any, List, Union, Tuple, Optional, Dict
 
 from bson import ObjectId
 from google.api_core.datetime_helpers import DatetimeWithNanoseconds
@@ -42,6 +42,10 @@ class Collection:
     @property
     def name(self):
         return self.schema.__name__
+
+    @property
+    def requires_owner(self):
+        return self.schema.__mro__[1] == SchemaWithOwner
 
     def get_unique_keys(self):
         return getattr(self.schema, '__unique_keys__', [])
@@ -256,6 +260,51 @@ class Collection:
         # See https://googleapis.dev/python/firestore/latest/document.html?highlight=update#google.cloud.firestore_v1.document.DocumentReference.update
         doc_ref.set(doc, merge=True)
 
+    def update_attribute(self,
+                         doc_id: str,
+                         attribute: str,
+                         value: Any,
+                         owner: Optional[str] = None,
+                         force: Optional[bool] = False) -> None:
+        return self.update_attributes(
+            doc_id=doc_id,
+            attributes={
+                attribute: value
+            },
+            owner=owner,
+            force=force)
+
+    def update_attributes(self,
+                          doc_id: str,
+                          attributes: Dict[str, Any],
+                          owner: Optional[str] = None,
+                          force: Optional[bool] = False) -> None:
+        if doc_id is None:
+            raise ValueError(f"Invalid `doc_id` provided: {doc_id}")
+
+        # Check for any restrictions
+        self._check_restrictions_attributes(
+            doc_id=doc_id,
+            attributes=attributes)
+
+        # Set updated date
+        doc = {
+            **attributes,
+            'updated_at': datetime.utcnow()
+        }
+
+        if self.requires_owner:
+            if not force and (owner is None and self.force_ownership):
+                raise ValueError(f"An `owner` must be defined for collection {self.name}")
+            doc['updated_by'] = owner
+
+        # Get document reference
+        doc_ref = self.collection.document(doc_id)
+
+        # See
+        # https://googleapis.dev/python/firestore/latest/document.html?highlight=update#google.cloud.firestore_v1.document.DocumentReference.update
+        doc_ref.update(doc)
+
     def bulk_update(self,
                     docs: List[Union[BaseModel, dict]],
                     owner: Optional[str] = None,
@@ -451,6 +500,26 @@ class Collection:
 
                 # If the clashing document is itself the allow clash
                 if is_update and doc.id == doc_db.id:
+                    continue
+
+                raise Conflict(f"{self.name} with {key} {value} already exists")
+            except NotFound:
+                # No document with given unique key found
+                pass
+
+    def _check_restrictions_attributes(self,
+                                       doc_id: str,
+                                       attributes: Dict[str, Any]):
+        # Check for any restrictions
+        for key in self.get_unique_keys():
+            if key not in attributes:
+                continue
+            value = attributes.get(key)
+            try:
+                doc_db = self.get_by_attribute(key, value)
+
+                # If the clashing document is itself then allow clash
+                if doc_id == doc_db.id:
                     continue
 
                 raise Conflict(f"{self.name} with {key} {value} already exists")
