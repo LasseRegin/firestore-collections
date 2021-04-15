@@ -21,3 +21,14 @@ def parse_document_to_dict(doc: BaseModel) -> Dict[str, Any]:
             doc[key] = value.value
 
     return doc
+
+
+def parse_attributes_to_dict(attributes: Dict[str, Any]) -> Dict[str, Any]:
+    # Check for any secret values and enum values
+    for key, value in attributes.items():
+        if isinstance(value, SecretStr):
+            attributes[key] = value.get_secret_value()
+        elif isinstance(value, Enum):
+            attributes[key] = value.value
+
+    return attributes

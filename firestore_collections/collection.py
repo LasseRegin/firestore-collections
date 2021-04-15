@@ -4,7 +4,7 @@ from typing import Any, List, Union, Tuple, Optional, Dict
 
 from bson import ObjectId
 from google.api_core.datetime_helpers import DatetimeWithNanoseconds
-from google.api_core.exceptions import NotFound, AlreadyExists, Conflict
+from google.api_core.exceptions import NotFound, Conflict
 from google.cloud.firestore_v1.batch import WriteBatch
 from google.cloud.firestore_v1.collection import CollectionReference
 from google.cloud.firestore import Client
@@ -12,7 +12,11 @@ from pydantic import BaseModel
 
 from firestore_collections.enums import OrderByDirection
 from firestore_collections.schema import SchemaWithOwner
-from firestore_collections.utils import chunks, parse_document_to_dict
+from firestore_collections.utils import (
+    chunks,
+    parse_attributes_to_dict,
+    parse_document_to_dict,
+)
 
 
 class Collection:
@@ -49,6 +53,11 @@ class Collection:
 
     def get_unique_keys(self):
         return getattr(self.schema, '__unique_keys__', [])
+
+    def has_attribute(self, attribute: str) -> bool:
+        if self.schema_props is not None:
+            return attribute in self.schema_props
+        return True
 
     @property
     def collection(self) -> CollectionReference:
@@ -282,6 +291,11 @@ class Collection:
         if doc_id is None:
             raise ValueError(f"Invalid `doc_id` provided: {doc_id}")
 
+        # Check if valid attribute keys provided
+        for key in attributes.keys():
+            if not self.has_attribute(attribute=key):
+                raise KeyError('Invalid attribute provided: `{key}`')
+
         # Check for any restrictions
         self._check_restrictions_attributes(
             doc_id=doc_id,
@@ -297,6 +311,9 @@ class Collection:
             if not force and (owner is None and self.force_ownership):
                 raise ValueError(f"An `owner` must be defined for collection {self.name}")
             doc['updated_by'] = owner
+
+        # Parse values
+        doc = parse_attributes_to_dict(attributes=doc)
 
         # Get document reference
         doc_ref = self.collection.document(doc_id)
