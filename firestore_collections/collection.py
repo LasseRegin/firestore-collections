@@ -116,7 +116,7 @@ class Collection:
                 order_by=order_by)
 
         if len(unique_operators) > 1:
-            allowed_mixed_operators = {u'>=', u'<=', u'==', u'>', u'<', u'in'}
+            allowed_mixed_operators = {u'>=', u'<=', u'==', u'!=', u'>', u'<', u'in'}
             if len(set(unique_operators) - allowed_mixed_operators) != 0:
                 raise ValueError(f"Only following operators can be mixed: {allowed_mixed_operators}")
 
