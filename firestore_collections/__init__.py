@@ -12,6 +12,8 @@ from firestore_collections.enums import (
 from firestore_collections.schema import (
     Schema,
     SchemaWithOwner,
+    StaticSchema,
+    StaticSchemaWithOwner,
 )
 
 
@@ -24,4 +26,6 @@ __all__ = [
     'OrderByDirection',
     'Schema',
     'SchemaWithOwner',
+    'StaticSchema',
+    'StaticSchemaWithOwner',
 ]
