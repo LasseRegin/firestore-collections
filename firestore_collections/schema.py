@@ -16,3 +16,14 @@ class Schema(BaseModel):
 class SchemaWithOwner(Schema):
     created_by: Optional[str]
     updated_by: Optional[str]
+
+
+class StaticSchema(BaseModel):
+    __collection_name__ = None
+
+    id: Optional[str]
+    created_at: Optional[FirestoreTimestamp]
+
+
+class StaticSchemaWithOwner(StaticSchema):
+    created_by: Optional[str]

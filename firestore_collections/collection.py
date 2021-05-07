@@ -11,7 +11,7 @@ from google.cloud.firestore import Client
 from pydantic import BaseModel
 
 from firestore_collections.enums import OrderByDirection
-from firestore_collections.schema import SchemaWithOwner
+from firestore_collections.schema import Schema, SchemaWithOwner
 from firestore_collections.utils import (
     chunks,
     parse_attributes_to_dict,
@@ -20,6 +20,8 @@ from firestore_collections.utils import (
 
 
 class Collection:
+    is_updatable = True
+
     def __init__(self,
                  schema: BaseModel,
                  firestore_client: Optional[Client] = None,
@@ -40,6 +42,7 @@ class Collection:
         if issubclass(self.schema, BaseModel):
             schema_pydantic = self.schema.schema()
             self.schema_props = schema_pydantic.get('properties', {})
+            self.is_updatable = self.has_attribute(attribute='updated_at')
         else:
             self.schema_props = None
 
@@ -245,8 +248,9 @@ class Collection:
         # Check for any restrictions
         self._check_restrictions(doc=doc, is_update=True)
 
-        # Set updated date
-        doc.updated_at = datetime.utcnow()
+        if self.is_updatable:
+            # Set updated date
+            doc.updated_at = datetime.utcnow()
 
         if isinstance(doc, SchemaWithOwner):
             if not force and (owner is None and self.force_ownership):
@@ -302,10 +306,9 @@ class Collection:
             attributes=attributes)
 
         # Set updated date
-        doc = {
-            **attributes,
-            'updated_at': datetime.utcnow()
-        }
+        doc = attributes
+        if self.is_updatable:
+            doc['updated_at'] = datetime.utcnow()
 
         if self.requires_owner:
             if not force and (owner is None and self.force_ownership):
@@ -456,11 +459,16 @@ class Collection:
                 raise ValueError(f"An `owner` must be defined for collection {self.name}")
 
             if owner is not None:
-                self.collection.document(id).set({
-                    'updated_at': datetime.utcnow(),
-                    'updated_by': owner,
-                    'deleted': True,
-                }, merge=True)
+                if self.is_updatable:
+                    self.collection.document(id).set({
+                        'updated_at': datetime.utcnow(),
+                        'updated_by': owner,
+                        'deleted': True,
+                    }, merge=True)
+                else:
+                    self.collection.document(id).set({
+                        'deleted': True,
+                    }, merge=True)
 
         self.collection.document(id).delete()
 
@@ -488,14 +496,22 @@ class Collection:
 
         for i, doc_id in enumerate(doc_ids):
             if update_before_delete:
-                write_batch.set(
-                    reference=self.collection.document(doc_id),
-                    document_data={
-                        'updated_at': datetime.utcnow(),
-                        'updated_by': owner,
-                        'deleted': True,
-                    },
-                    merge=True)
+                if self.is_updatable:
+                    write_batch.set(
+                        reference=self.collection.document(doc_id),
+                        document_data={
+                            'updated_at': datetime.utcnow(),
+                            'updated_by': owner,
+                            'deleted': True,
+                        },
+                        merge=True)
+                else:
+                    write_batch.set(
+                        reference=self.collection.document(doc_id),
+                        document_data={
+                            'deleted': True,
+                        },
+                        merge=True)
 
             write_batch.delete(reference=self.collection.document(doc_id))
 
