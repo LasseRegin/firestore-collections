@@ -11,7 +11,7 @@ from google.cloud.firestore import Client
 from pydantic import BaseModel
 
 from firestore_collections.enums import OrderByDirection
-from firestore_collections.schema import Schema, SchemaWithOwner
+from firestore_collections.schema import StaticSchemaWithOwner, SchemaWithOwner
 from firestore_collections.utils import (
     chunks,
     parse_attributes_to_dict,
@@ -52,7 +52,10 @@ class Collection:
 
     @property
     def requires_owner(self):
-        return self.schema.__mro__[1] == SchemaWithOwner
+        return (
+            self.schema.__mro__[1] == SchemaWithOwner or
+            self.schema.__mro__[1] == StaticSchemaWithOwner
+        )
 
     def get_unique_keys(self):
         return getattr(self.schema, '__unique_keys__', [])
@@ -252,7 +255,7 @@ class Collection:
             # Set updated date
             doc.updated_at = datetime.utcnow()
 
-        if isinstance(doc, SchemaWithOwner):
+        if self.requires_owner:
             if not force and (owner is None and self.force_ownership):
                 raise ValueError(f"An `owner` must be defined for collection {self.name}")
             doc.updated_by = owner
@@ -383,7 +386,7 @@ class Collection:
         # Set created date
         doc.created_at = datetime.utcnow()
 
-        if isinstance(doc, SchemaWithOwner):
+        if self.requires_owner:
             if not force and (owner is None and self.force_ownership):
                 raise ValueError(f"An `owner` must be defined for collection {self.name}")
             doc.created_by = owner
