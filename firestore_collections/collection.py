@@ -52,10 +52,18 @@ class Collection:
 
     @property
     def requires_owner(self):
+        return self.requires_owner_insert
+
+    @property
+    def requires_owner_insert(self):
         return (
             self.schema.__mro__[1] == SchemaWithOwner or
             self.schema.__mro__[1] == StaticSchemaWithOwner
         )
+
+    @property
+    def requires_owner_update(self):
+        return self.schema.__mro__[1] == SchemaWithOwner
 
     def get_unique_keys(self):
         return getattr(self.schema, '__unique_keys__', [])
@@ -255,7 +263,7 @@ class Collection:
             # Set updated date
             doc.updated_at = datetime.utcnow()
 
-        if self.requires_owner:
+        if self.requires_owner_update:
             if not force and (owner is None and self.force_ownership):
                 raise ValueError(f"An `owner` must be defined for collection {self.name}")
             doc.updated_by = owner
@@ -313,7 +321,7 @@ class Collection:
         if self.is_updatable:
             doc['updated_at'] = datetime.utcnow()
 
-        if self.requires_owner:
+        if self.requires_owner_update:
             if not force and (owner is None and self.force_ownership):
                 raise ValueError(f"An `owner` must be defined for collection {self.name}")
             doc['updated_by'] = owner
@@ -386,7 +394,7 @@ class Collection:
         # Set created date
         doc.created_at = datetime.utcnow()
 
-        if self.requires_owner:
+        if self.requires_owner_insert:
             if not force and (owner is None and self.force_ownership):
                 raise ValueError(f"An `owner` must be defined for collection {self.name}")
             doc.created_by = owner
