@@ -341,7 +341,7 @@ class Collection:
                     owner: Optional[str] = None,
                     force: Optional[bool] = False,
                     merge: Optional[bool] = False,
-                    batch_size: Optional[int] = 500) -> None:
+                    batch_size: Optional[int] = 300) -> None:
         if batch_size <= 0:
             raise ValueError('`batch_size` must be larger than 0')
         if len(docs) == 0:
@@ -422,7 +422,7 @@ class Collection:
                     docs: List[Union[BaseModel, dict]],
                     owner: Optional[str] = None,
                     force: Optional[bool] = False,
-                    batch_size: Optional[int] = 500) -> None:
+                    batch_size: Optional[int] = 300) -> None:
         if batch_size <= 0:
             raise ValueError('`batch_size` must be larger than 0')
         if len(docs) == 0:
@@ -487,7 +487,7 @@ class Collection:
                     doc_ids: List[str],
                     owner: Optional[str] = None,
                     force: Optional[bool] = False,
-                    batch_size: Optional[int] = 500) -> None:
+                    batch_size: Optional[int] = 300) -> None:
         if batch_size <= 0:
             raise ValueError('`batch_size` must be larger than 0')
         if len(doc_ids) == 0:
