@@ -505,6 +505,9 @@ class Collection:
         # Define batch operation
         write_batch = WriteBatch(client=self._client)
 
+        if update_before_delete:
+            batch_size = max(1, batch_size // 2)
+
         for i, doc_id in enumerate(doc_ids):
             if update_before_delete:
                 if self.is_updatable:
