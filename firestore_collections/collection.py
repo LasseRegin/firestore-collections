@@ -107,6 +107,9 @@ class Collection:
         # Parse condition values based on attribute type
         conditions = self._parse_conditions(conditions)
 
+        # Parse order by values
+        order_by = self._parse_order_by(order_by)
+
         # Sanity checks
         operators = [x[1].lower() for x in conditions]
         operator_counts = Counter(operators)
@@ -579,6 +582,9 @@ class Collection:
         conditions_parsed = []
         if self.schema_props is not None:
             for attribute, operator, value in conditions:
+                if not self.has_attribute(attribute):
+                    raise KeyError('Invalid attribute provided: `{attribute}`')
+
                 attr_props = self.schema_props.get(attribute, {})
                 any_of = attr_props.get('anyOf', [])
 
@@ -594,3 +600,9 @@ class Collection:
                             pass
                 conditions_parsed.append((attribute, operator, value))
         return conditions_parsed
+
+    def _parse_order_by(self, order_by: Optional[List[Tuple[str, OrderByDirection]]] = []) -> List[Tuple[str, OrderByDirection]]:
+        for attribute, order_by_direction in order_by:
+            if not self.has_attribute(attribute):
+                raise KeyError('Invalid attribute provided: `{attribute}`')
+        return order_by
