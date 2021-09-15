@@ -22,27 +22,30 @@ from firestore_collections.utils import (
 class Collection:
     is_updatable = True
 
-    def __init__(self,
-                 schema: BaseModel,
-                 firestore_client: Optional[Client] = None,
-                 force_ownership: Optional[bool] = False):
+    def __init__(
+        self,
+        schema: BaseModel,
+        firestore_client: Optional[Client] = None,
+        force_ownership: Optional[bool] = False,
+    ):
         self.schema = schema
         self.collection_name = schema.__collection_name__
         self.force_ownership = force_ownership
 
         if self.collection_name is None:
-            raise ValueError('`__collection_name__` has not been defined')
+            raise ValueError("`__collection_name__` has not been defined")
 
         if firestore_client is None:
             from firestore_collections.client import client
+
             self._client = client
         else:
             self._client = firestore_client
 
         if issubclass(self.schema, BaseModel):
             schema_pydantic = self.schema.schema()
-            self.schema_props = schema_pydantic.get('properties', {})
-            self.is_updatable = self.has_attribute(attribute='updated_at')
+            self.schema_props = schema_pydantic.get("properties", {})
+            self.is_updatable = self.has_attribute(attribute="updated_at")
         else:
             self.schema_props = None
 
@@ -57,8 +60,8 @@ class Collection:
     @property
     def requires_owner_insert(self):
         return (
-            self.schema.__mro__[1] == SchemaWithOwner or
-            self.schema.__mro__[1] == StaticSchemaWithOwner
+            self.schema.__mro__[1] == SchemaWithOwner
+            or self.schema.__mro__[1] == StaticSchemaWithOwner
         )
 
     @property
@@ -66,7 +69,7 @@ class Collection:
         return self.schema.__mro__[1] == SchemaWithOwner
 
     def get_unique_keys(self):
-        return getattr(self.schema, '__unique_keys__', [])
+        return getattr(self.schema, "__unique_keys__", [])
 
     def has_attribute(self, attribute: str) -> bool:
         if self.schema_props is not None:
@@ -84,26 +87,30 @@ class Collection:
         if not doc.exists:
             raise NotFound(f"Document {self.collection_name}.{id} could not be found")
 
-        return self.schema(**{**doc.to_dict(), 'id': doc.id})
+        return self.schema(**{**doc.to_dict(), "id": doc.id})
 
-    def get_all(self,
-                limit: Optional[int] = None,
-                order_by: Optional[List[Tuple[str, OrderByDirection]]] = []
-                ) -> List[Any]:
+    def get_all(
+        self,
+        limit: Optional[int] = None,
+        order_by: Optional[List[Tuple[str, OrderByDirection]]] = [],
+    ) -> List[Any]:
         return self._query(conditions=[], limit=limit, order_by=order_by)
 
     def get_by_attribute(self, attribute: str, value: Any) -> Any:
         docs = self.query_by_attribute(attribute=attribute, value=value)
         if len(docs) == 0:
-            raise NotFound(f"Document could not be found in {self.collection_name} with `{attribute}=={value}`")
+            raise NotFound(
+                f"Document could not be found in {self.collection_name} with `{attribute}=={value}`"
+            )
 
         return docs[0]
 
-    def _query(self,
-               conditions: List[Tuple[str, str, Any]],
-               limit: Optional[int] = None,
-               order_by: Optional[List[Tuple[str, OrderByDirection]]] = []
-               ) -> List[Any]:
+    def _query(
+        self,
+        conditions: List[Tuple[str, str, Any]],
+        limit: Optional[int] = None,
+        order_by: Optional[List[Tuple[str, OrderByDirection]]] = [],
+    ) -> List[Any]:
         # Parse condition values based on attribute type
         conditions = self._parse_conditions(conditions)
 
@@ -114,13 +121,13 @@ class Collection:
         operators = [x[1].lower() for x in conditions]
         operator_counts = Counter(operators)
         unique_operators = list(operator_counts.keys())
-        in_operator_count = operator_counts.get(u'in', 0)
+        in_operator_count = operator_counts.get("in", 0)
 
         if in_operator_count > 1:
-            raise ValueError('Cannot use more than one `in` operator in conditions')
+            raise ValueError("Cannot use more than one `in` operator in conditions")
 
         if in_operator_count == 1:
-            in_operator_idx = operators.index(u'in')
+            in_operator_idx = operators.index("in")
             in_condition = conditions.pop(in_operator_idx)
             attribute, _, values = in_condition
             return self._query_in(
@@ -130,12 +137,15 @@ class Collection:
                 additional_attributes=[x[0] for x in conditions],
                 additional_values=[x[2] for x in conditions],
                 additional_operator=[x[1] for x in conditions],
-                order_by=order_by)
+                order_by=order_by,
+            )
 
         if len(unique_operators) > 1:
-            allowed_mixed_operators = {u'>=', u'<=', u'==', u'!=', u'>', u'<', u'in'}
+            allowed_mixed_operators = {">=", "<=", "==", "!=", ">", "<", "in"}
             if len(set(unique_operators) - allowed_mixed_operators) != 0:
-                raise ValueError(f"Only following operators can be mixed: {allowed_mixed_operators}")
+                raise ValueError(
+                    f"Only following operators can be mixed: {allowed_mixed_operators}"
+                )
 
         # Init docs object
         docs = self.collection
@@ -157,35 +167,37 @@ class Collection:
         # Create generator
         docs = docs.stream()
 
-        return [
-            self.schema(**{**doc.to_dict(), 'id': doc.id})
-            for doc in docs
-        ]
+        return [self.schema(**{**doc.to_dict(), "id": doc.id}) for doc in docs]
 
-    def _query_in(self,
-                  attribute: str,
-                  values: Any,
-                  additional_attributes: Optional[List[str]] = [],
-                  additional_values: Optional[List[Any]] = [],
-                  additional_operator: Optional[List[str]] = [],
-                  limit: Optional[int] = None,
-                  order_by: Optional[List[Tuple[str, OrderByDirection]]] = []
-                  ) -> List[Any]:
+    def _query_in(
+        self,
+        attribute: str,
+        values: Any,
+        additional_attributes: Optional[List[str]] = [],
+        additional_values: Optional[List[Any]] = [],
+        additional_operator: Optional[List[str]] = [],
+        limit: Optional[int] = None,
+        order_by: Optional[List[Tuple[str, OrderByDirection]]] = [],
+    ) -> List[Any]:
         # Split values up in N lists of max 10
         # since Firestore limits the `in` operator
         # to max 10 values
         values_lists = list(chunks(values, n=10))
 
         if len(values_lists) > 10:
-            raise ValueError('Too many values provided for `in` query')
+            raise ValueError("Too many values provided for `in` query")
 
         if len(order_by) > 0:
-            raise NotImplementedError('`order_by` has not been implemented yet')
+            raise NotImplementedError("`order_by` has not been implemented yet")
 
         if len(additional_attributes) != len(additional_values):
-            raise ValueError('Size of `additional_attributes` and `additional_values` must match')
+            raise ValueError(
+                "Size of `additional_attributes` and `additional_values` must match"
+            )
         if len(additional_values) != len(additional_operator):
-            raise ValueError('Size of `additional_values` and `additional_operator` must match')
+            raise ValueError(
+                "Size of `additional_values` and `additional_operator` must match"
+            )
 
         docs_all = []
         for values in values_lists:
@@ -193,7 +205,7 @@ class Collection:
             docs = self.collection
 
             # Add conditions (where clauses)
-            docs = docs.where(attribute, u'in', values)
+            docs = docs.where(attribute, "in", values)
 
             for _attribute, _value, _operator in zip(
                 additional_attributes,
@@ -208,34 +220,34 @@ class Collection:
 
             # Create generator
             docs = [
-                self.schema(**{**doc.to_dict(), 'id': doc.id})
-                for doc in docs.stream()
+                self.schema(**{**doc.to_dict(), "id": doc.id}) for doc in docs.stream()
             ]
             docs_all.extend(docs)
 
         return docs_all
 
-    def query_by_attribute(self,
-                           attribute: str,
-                           value: Any,
-                           operator: Optional[str] = u'==',
-                           limit: Optional[int] = None,
-                           order_by: Optional[List[Tuple[str, OrderByDirection]]] = []
-                           ) -> List[Any]:
+    def query_by_attribute(
+        self,
+        attribute: str,
+        value: Any,
+        operator: Optional[str] = "==",
+        limit: Optional[int] = None,
+        order_by: Optional[List[Tuple[str, OrderByDirection]]] = [],
+    ) -> List[Any]:
         return self._query(
-            conditions=[(attribute, operator, value)],
-            limit=limit,
-            order_by=order_by)
+            conditions=[(attribute, operator, value)], limit=limit, order_by=order_by
+        )
 
-    def query_by_attributes(self,
-                            attributes: List[str],
-                            values: List[Any],
-                            operators: List[str],
-                            limit: Optional[int] = None,
-                            order_by: Optional[List[Tuple[str, OrderByDirection]]] = []
-                            ) -> List[Any]:
+    def query_by_attributes(
+        self,
+        attributes: List[str],
+        values: List[Any],
+        operators: List[str],
+        limit: Optional[int] = None,
+        order_by: Optional[List[Tuple[str, OrderByDirection]]] = [],
+    ) -> List[Any]:
         if len(attributes) != len(values):
-            raise ValueError('Number af attributes and values provided must be equal')
+            raise ValueError("Number af attributes and values provided must be equal")
 
         return self._query(
             conditions=[
@@ -243,13 +255,16 @@ class Collection:
                 for attribute, operator, value in zip(attributes, operators, values)
             ],
             limit=limit,
-            order_by=order_by)
+            order_by=order_by,
+        )
 
-    def update(self,
-               doc: Union[BaseModel, dict],
-               owner: Optional[str] = None,
-               force: Optional[bool] = False,
-               dry_run: Optional[bool] = False) -> None:
+    def update(
+        self,
+        doc: Union[BaseModel, dict],
+        owner: Optional[str] = None,
+        force: Optional[bool] = False,
+        dry_run: Optional[bool] = False,
+    ) -> None:
         if isinstance(doc, BaseModel) and not isinstance(doc, self.schema):
             raise ValueError(f"Invalid schema used for provided document: {doc}")
 
@@ -268,7 +283,9 @@ class Collection:
 
         if self.requires_owner_update:
             if not force and (owner is None and self.force_ownership):
-                raise ValueError(f"An `owner` must be defined for collection {self.name}")
+                raise ValueError(
+                    f"An `owner` must be defined for collection {self.name}"
+                )
             doc.updated_by = owner
 
         # Convert from schema to dictionary
@@ -287,47 +304,47 @@ class Collection:
         # See https://googleapis.dev/python/firestore/latest/document.html?highlight=update#google.cloud.firestore_v1.document.DocumentReference.update
         doc_ref.set(doc, merge=True)
 
-    def update_attribute(self,
-                         doc_id: str,
-                         attribute: str,
-                         value: Any,
-                         owner: Optional[str] = None,
-                         force: Optional[bool] = False) -> None:
+    def update_attribute(
+        self,
+        doc_id: str,
+        attribute: str,
+        value: Any,
+        owner: Optional[str] = None,
+        force: Optional[bool] = False,
+    ) -> None:
         return self.update_attributes(
-            doc_id=doc_id,
-            attributes={
-                attribute: value
-            },
-            owner=owner,
-            force=force)
+            doc_id=doc_id, attributes={attribute: value}, owner=owner, force=force
+        )
 
-    def update_attributes(self,
-                          doc_id: str,
-                          attributes: Dict[str, Any],
-                          owner: Optional[str] = None,
-                          force: Optional[bool] = False) -> None:
+    def update_attributes(
+        self,
+        doc_id: str,
+        attributes: Dict[str, Any],
+        owner: Optional[str] = None,
+        force: Optional[bool] = False,
+    ) -> None:
         if doc_id is None:
             raise ValueError(f"Invalid `doc_id` provided: {doc_id}")
 
         # Check if valid attribute keys provided
         for key in attributes.keys():
             if not self.has_attribute(attribute=key):
-                raise KeyError('Invalid attribute provided: `{key}`')
+                raise KeyError("Invalid attribute provided: `{key}`")
 
         # Check for any restrictions
-        self._check_restrictions_attributes(
-            doc_id=doc_id,
-            attributes=attributes)
+        self._check_restrictions_attributes(doc_id=doc_id, attributes=attributes)
 
         # Set updated date
         doc = attributes
         if self.is_updatable:
-            doc['updated_at'] = datetime.utcnow()
+            doc["updated_at"] = datetime.utcnow()
 
         if self.requires_owner_update:
             if not force and (owner is None and self.force_ownership):
-                raise ValueError(f"An `owner` must be defined for collection {self.name}")
-            doc['updated_by'] = owner
+                raise ValueError(
+                    f"An `owner` must be defined for collection {self.name}"
+                )
+            doc["updated_by"] = owner
 
         # Parse values
         doc = parse_attributes_to_dict(attributes=doc)
@@ -339,24 +356,26 @@ class Collection:
         # https://googleapis.dev/python/firestore/latest/document.html?highlight=update#google.cloud.firestore_v1.document.DocumentReference.update
         doc_ref.update(doc)
 
-    def bulk_update(self,
-                    docs: List[Union[BaseModel, dict]],
-                    owner: Optional[str] = None,
-                    force: Optional[bool] = False,
-                    merge: Optional[bool] = False,
-                    batch_size: Optional[int] = 300) -> None:
+    def bulk_update(
+        self,
+        docs: List[Union[BaseModel, dict]],
+        owner: Optional[str] = None,
+        force: Optional[bool] = False,
+        merge: Optional[bool] = False,
+        batch_size: Optional[int] = 300,
+    ) -> None:
         if batch_size <= 0:
-            raise ValueError('`batch_size` must be larger than 0')
+            raise ValueError("`batch_size` must be larger than 0")
         if len(docs) == 0:
-            raise ValueError('No documents provided')
+            raise ValueError("No documents provided")
 
         # Parse all docs to dicts
         docs = [
             self.update(
-               doc=doc,
-               owner=owner,
-               force=force,
-               dry_run=True,
+                doc=doc,
+                owner=owner,
+                force=force,
+                dry_run=True,
             )
             for doc in docs
         ]
@@ -365,14 +384,15 @@ class Collection:
         write_batch = WriteBatch(client=self._client)
 
         for i, doc in enumerate(docs):
-            doc_id = doc.pop('id', None)
+            doc_id = doc.pop("id", None)
             if doc_id is None:
                 doc_id = str(ObjectId())
 
             write_batch.set(
                 reference=self.collection.document(doc_id),
                 document_data=doc,
-                merge=merge)
+                merge=merge,
+            )
 
             if (i + 1) % batch_size == 0:
                 # Execute batch operation
@@ -383,11 +403,13 @@ class Collection:
             # Execute batch operation
             write_batch.commit()
 
-    def insert(self,
-               doc: Union[BaseModel, dict],
-               owner: Optional[str] = None,
-               force: Optional[bool] = False,
-               dry_run: Optional[bool] = False) -> BaseModel:
+    def insert(
+        self,
+        doc: Union[BaseModel, dict],
+        owner: Optional[str] = None,
+        force: Optional[bool] = False,
+        dry_run: Optional[bool] = False,
+    ) -> BaseModel:
         if isinstance(doc, BaseModel) and not isinstance(doc, self.schema):
             raise ValueError(f"Invalid schema used for provided document: {doc}")
 
@@ -399,7 +421,9 @@ class Collection:
 
         if self.requires_owner_insert:
             if not force and (owner is None and self.force_ownership):
-                raise ValueError(f"An `owner` must be defined for collection {self.name}")
+                raise ValueError(
+                    f"An `owner` must be defined for collection {self.name}"
+                )
             doc.created_by = owner
 
         # Check for any restrictions
@@ -412,32 +436,34 @@ class Collection:
             return doc
 
         # Insert new document
-        new_id = doc.pop('id', None)
+        new_id = doc.pop("id", None)
         if new_id is None:
             new_id = str(ObjectId())
         doc_ref = self.collection.document(new_id)
         doc_ref.create(doc)
         doc = doc_ref.get()
 
-        return self.schema(**{**doc.to_dict(), 'id': doc.id})
+        return self.schema(**{**doc.to_dict(), "id": doc.id})
 
-    def bulk_insert(self,
-                    docs: List[Union[BaseModel, dict]],
-                    owner: Optional[str] = None,
-                    force: Optional[bool] = False,
-                    batch_size: Optional[int] = 300) -> None:
+    def bulk_insert(
+        self,
+        docs: List[Union[BaseModel, dict]],
+        owner: Optional[str] = None,
+        force: Optional[bool] = False,
+        batch_size: Optional[int] = 300,
+    ) -> None:
         if batch_size <= 0:
-            raise ValueError('`batch_size` must be larger than 0')
+            raise ValueError("`batch_size` must be larger than 0")
         if len(docs) == 0:
-            raise ValueError('No documents provided')
+            raise ValueError("No documents provided")
 
         # Parse all docs to dicts
         docs = [
             self.insert(
-               doc=doc,
-               owner=owner,
-               force=force,
-               dry_run=True,
+                doc=doc,
+                owner=owner,
+                force=force,
+                dry_run=True,
             )
             for doc in docs
         ]
@@ -446,13 +472,13 @@ class Collection:
         write_batch = WriteBatch(client=self._client)
 
         for i, doc in enumerate(docs):
-            doc_id = doc.pop('id', None)
+            doc_id = doc.pop("id", None)
             if doc_id is None:
                 doc_id = str(ObjectId())
 
             write_batch.create(
-                reference=self.collection.document(doc_id),
-                document_data=doc)
+                reference=self.collection.document(doc_id), document_data=doc
+            )
 
             if (i + 1) % batch_size == 0:
                 # Execute batch operation
@@ -463,44 +489,55 @@ class Collection:
             # Execute batch operation
             write_batch.commit()
 
-    def delete(self,
-               id: str,
-               owner: Optional[str] = None,
-               force: Optional[bool] = False) -> None:
+    def delete(
+        self, id: str, owner: Optional[str] = None, force: Optional[bool] = False
+    ) -> None:
         # Set updated by and time before deleting to trigger change
         if issubclass(self.schema, SchemaWithOwner):
             if not force and (owner is None and self.force_ownership):
-                raise ValueError(f"An `owner` must be defined for collection {self.name}")
+                raise ValueError(
+                    f"An `owner` must be defined for collection {self.name}"
+                )
 
             if owner is not None:
                 if self.is_updatable:
-                    self.collection.document(id).set({
-                        'updated_at': datetime.utcnow(),
-                        'updated_by': owner,
-                        'deleted': True,
-                    }, merge=True)
+                    self.collection.document(id).set(
+                        {
+                            "updated_at": datetime.utcnow(),
+                            "updated_by": owner,
+                            "deleted": True,
+                        },
+                        merge=True,
+                    )
                 else:
-                    self.collection.document(id).set({
-                        'deleted': True,
-                    }, merge=True)
+                    self.collection.document(id).set(
+                        {
+                            "deleted": True,
+                        },
+                        merge=True,
+                    )
 
         self.collection.document(id).delete()
 
-    def bulk_delete(self,
-                    doc_ids: List[str],
-                    owner: Optional[str] = None,
-                    force: Optional[bool] = False,
-                    batch_size: Optional[int] = 300) -> None:
+    def bulk_delete(
+        self,
+        doc_ids: List[str],
+        owner: Optional[str] = None,
+        force: Optional[bool] = False,
+        batch_size: Optional[int] = 300,
+    ) -> None:
         if batch_size <= 0:
-            raise ValueError('`batch_size` must be larger than 0')
+            raise ValueError("`batch_size` must be larger than 0")
         if len(doc_ids) == 0:
-            raise ValueError('No document IDs provided')
+            raise ValueError("No document IDs provided")
 
         # Set updated by and time before deleting to trigger change
         update_before_delete = False
         if issubclass(self.schema, SchemaWithOwner):
             if not force and (owner is None and self.force_ownership):
-                raise ValueError(f"An `owner` must be defined for collection {self.name}")
+                raise ValueError(
+                    f"An `owner` must be defined for collection {self.name}"
+                )
 
             if owner is not None:
                 update_before_delete = True
@@ -517,18 +554,20 @@ class Collection:
                     write_batch.set(
                         reference=self.collection.document(doc_id),
                         document_data={
-                            'updated_at': datetime.utcnow(),
-                            'updated_by': owner,
-                            'deleted': True,
+                            "updated_at": datetime.utcnow(),
+                            "updated_by": owner,
+                            "deleted": True,
                         },
-                        merge=True)
+                        merge=True,
+                    )
                 else:
                     write_batch.set(
                         reference=self.collection.document(doc_id),
                         document_data={
-                            'deleted': True,
+                            "deleted": True,
                         },
-                        merge=True)
+                        merge=True,
+                    )
 
             write_batch.delete(reference=self.collection.document(doc_id))
 
@@ -557,9 +596,7 @@ class Collection:
                 # No document with given unique key found
                 pass
 
-    def _check_restrictions_attributes(self,
-                                       doc_id: str,
-                                       attributes: Dict[str, Any]):
+    def _check_restrictions_attributes(self, doc_id: str, attributes: Dict[str, Any]):
         # Check for any restrictions
         for key in self.get_unique_keys():
             if key not in attributes:
@@ -577,22 +614,21 @@ class Collection:
                 # No document with given unique key found
                 pass
 
-    def _parse_conditions(self, conditions: List[Tuple[str, str, Any]]) -> List[Tuple[str, str, Any]]:
+    def _parse_conditions(
+        self, conditions: List[Tuple[str, str, Any]]
+    ) -> List[Tuple[str, str, Any]]:
         conditions = list(conditions)
         conditions_parsed = []
         if self.schema_props is not None:
             for attribute, operator, value in conditions:
                 if not self.has_attribute(attribute):
-                    raise KeyError('Invalid attribute provided: `{attribute}`')
+                    raise KeyError(f"Invalid attribute provided: `{attribute}`")
 
                 attr_props = self.schema_props.get(attribute, {})
-                any_of = attr_props.get('anyOf', [])
+                any_of = attr_props.get("anyOf", [])
 
                 # Check if schema is a datetime
-                if any((
-                    x.get('format') == 'date-time'
-                    for x in any_of
-                )):
+                if any((x.get("format") == "date-time" for x in any_of)):
                     if type(value) == str:
                         try:
                             value = DatetimeWithNanoseconds.fromisoformat(value)
@@ -601,8 +637,10 @@ class Collection:
                 conditions_parsed.append((attribute, operator, value))
         return conditions_parsed
 
-    def _parse_order_by(self, order_by: Optional[List[Tuple[str, OrderByDirection]]] = []) -> List[Tuple[str, OrderByDirection]]:
+    def _parse_order_by(
+        self, order_by: Optional[List[Tuple[str, OrderByDirection]]] = []
+    ) -> List[Tuple[str, OrderByDirection]]:
         for attribute, order_by_direction in order_by:
             if not self.has_attribute(attribute):
-                raise KeyError('Invalid attribute provided: `{attribute}`')
+                raise KeyError(f"Invalid attribute provided: `{attribute}`")
         return order_by

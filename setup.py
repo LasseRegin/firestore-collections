@@ -15,7 +15,7 @@ with open(os.path.join(DIR, "requirements.txt"), "r") as f:
 
 setuptools.setup(
     name="firestore-collections",
-    version="0.4.6",
+    version="0.4.7",
     author="Lasse Regin Nielsen",
     author_email="lasseregin@gmail.com",
     description="Simple Firestore collection definitions and queries using pydantic schemas and Firestore query API.",
@@ -30,9 +30,6 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     python_requires=">=3.6",
-    package_data={"": [
-        "LICENSE",
-        "requirements.txt"
-    ]},
+    package_data={"": ["LICENSE", "requirements.txt"]},
     include_package_data=True,
 )
