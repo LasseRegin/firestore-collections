@@ -184,7 +184,7 @@ class Collection:
         # to max 10 values
         values_lists = list(chunks(values, n=10))
 
-        if len(values_lists) > 10:
+        if len(values_lists) > 100:
             raise ValueError("Too many values provided for `in` query")
 
         if len(order_by) > 0:
