@@ -80,12 +80,32 @@ class Collection:
     def collection(self) -> CollectionReference:
         return self._client.collection(self.collection_name)
 
-    def get(self, id: str) -> Any:
+    def get(
+        self,
+        id: str,
+        include_attributes: Optional[List[str]] = None,
+        return_attribute: Optional[str] = None,
+    ) -> Any:
+        if include_attributes is not None and return_attribute is not None:
+            raise KeyError(
+                f"Cannot provide both `include_attributes` and `return_attribute`"
+            )
+        if return_attribute is not None:
+            include_attributes = [return_attribute]
+        if include_attributes is not None:
+            if any(
+                (not self.has_attribute(attribute) for attribute in include_attributes)
+            ):
+                raise KeyError("Invalid attribute provided: `{attribute}`")
+
         doc_ref = self.collection.document(id)
-        doc = doc_ref.get()
+        doc = doc_ref.get(field_paths=include_attributes)
 
         if not doc.exists:
             raise NotFound(f"Document {self.collection_name}.{id} could not be found")
+
+        if return_attribute is not None:
+            return doc.get(return_attribute)
 
         return self.schema(**{**doc.to_dict(), "id": doc.id})
 
@@ -101,6 +121,10 @@ class Collection:
         if len(docs) == 0:
             raise NotFound(
                 f"Document could not be found in {self.collection_name} with `{attribute}=={value}`"
+            )
+        elif len(docs) > 1:
+            raise NotFound(
+                f"Founder more than one document in {self.collection_name} with `{attribute}=={value}`"
             )
 
         return docs[0]
