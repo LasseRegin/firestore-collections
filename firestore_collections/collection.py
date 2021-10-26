@@ -1,6 +1,6 @@
 from collections import Counter
 from datetime import datetime
-from typing import Any, List, Union, Tuple, Optional, Dict
+from typing import Any, List, Union, Tuple, Optional, Dict, TypeVar, Generic
 
 from bson import ObjectId
 from google.api_core.datetime_helpers import DatetimeWithNanoseconds
@@ -19,7 +19,10 @@ from firestore_collections.utils import (
 )
 
 
-class Collection:
+T = TypeVar("T")
+
+
+class Collection(Generic[T]):
     is_updatable = True
 
     def __init__(
@@ -50,25 +53,25 @@ class Collection:
             self.schema_props = None
 
     @property
-    def name(self):
+    def name(self) -> str:
         return self.schema.__name__
 
     @property
-    def requires_owner(self):
+    def requires_owner(self) -> bool:
         return self.requires_owner_insert
 
     @property
-    def requires_owner_insert(self):
+    def requires_owner_insert(self) -> bool:
         return (
             self.schema.__mro__[1] == SchemaWithOwner
             or self.schema.__mro__[1] == StaticSchemaWithOwner
         )
 
     @property
-    def requires_owner_update(self):
+    def requires_owner_update(self) -> bool:
         return self.schema.__mro__[1] == SchemaWithOwner
 
-    def get_unique_keys(self):
+    def get_unique_keys(self) -> List[str]:
         return getattr(self.schema, "__unique_keys__", [])
 
     def has_attribute(self, attribute: str) -> bool:
@@ -85,7 +88,7 @@ class Collection:
         id: str,
         include_attributes: Optional[List[str]] = None,
         return_attribute: Optional[str] = None,
-    ) -> Any:
+    ) -> T:
         if include_attributes is not None and return_attribute is not None:
             raise KeyError(
                 f"Cannot provide both `include_attributes` and `return_attribute`"
@@ -113,10 +116,10 @@ class Collection:
         self,
         limit: Optional[int] = None,
         order_by: Optional[List[Tuple[str, OrderByDirection]]] = [],
-    ) -> List[Any]:
+    ) -> List[T]:
         return self._query(conditions=[], limit=limit, order_by=order_by)
 
-    def get_by_attribute(self, attribute: str, value: Any) -> Any:
+    def get_by_attribute(self, attribute: str, value: Any) -> T:
         docs = self.query_by_attribute(attribute=attribute, value=value)
         if len(docs) == 0:
             raise NotFound(
@@ -134,7 +137,7 @@ class Collection:
         conditions: List[Tuple[str, str, Any]],
         limit: Optional[int] = None,
         order_by: Optional[List[Tuple[str, OrderByDirection]]] = [],
-    ) -> List[Any]:
+    ) -> List[T]:
         # Parse condition values based on attribute type
         conditions = self._parse_conditions(conditions)
 
@@ -202,7 +205,7 @@ class Collection:
         additional_operator: Optional[List[str]] = [],
         limit: Optional[int] = None,
         order_by: Optional[List[Tuple[str, OrderByDirection]]] = [],
-    ) -> List[Any]:
+    ) -> List[T]:
         # Split values up in N lists of max 10
         # since Firestore limits the `in` operator
         # to max 10 values
@@ -257,7 +260,7 @@ class Collection:
         operator: Optional[str] = "==",
         limit: Optional[int] = None,
         order_by: Optional[List[Tuple[str, OrderByDirection]]] = [],
-    ) -> List[Any]:
+    ) -> List[T]:
         return self._query(
             conditions=[(attribute, operator, value)], limit=limit, order_by=order_by
         )
@@ -269,7 +272,7 @@ class Collection:
         operators: List[str],
         limit: Optional[int] = None,
         order_by: Optional[List[Tuple[str, OrderByDirection]]] = [],
-    ) -> List[Any]:
+    ) -> List[T]:
         if len(attributes) != len(values):
             raise ValueError("Number af attributes and values provided must be equal")
 
@@ -433,7 +436,7 @@ class Collection:
         owner: Optional[str] = None,
         force: Optional[bool] = False,
         dry_run: Optional[bool] = False,
-    ) -> BaseModel:
+    ) -> T:
         if isinstance(doc, BaseModel) and not isinstance(doc, self.schema):
             raise ValueError(f"Invalid schema used for provided document: {doc}")
 
