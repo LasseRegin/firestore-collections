@@ -1,5 +1,5 @@
 from collections import Counter
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, List, Union, Tuple, Optional, Dict, TypeVar, Generic
 
 from bson import ObjectId
@@ -306,7 +306,7 @@ class Collection(Generic[T]):
 
         if self.is_updatable:
             # Set updated date
-            doc.updated_at = datetime.utcnow()
+            doc.updated_at = datetime.utcnow().replace(tzinfo=timezone.utc)
 
         if self.requires_owner_update:
             if not force and (owner is None and self.force_ownership):
@@ -364,7 +364,7 @@ class Collection(Generic[T]):
         # Set updated date
         doc = attributes
         if self.is_updatable:
-            doc["updated_at"] = datetime.utcnow()
+            doc["updated_at"] = datetime.utcnow().replace(tzinfo=timezone.utc)
 
         if self.requires_owner_update:
             if not force and (owner is None and self.force_ownership):
@@ -444,7 +444,7 @@ class Collection(Generic[T]):
             doc = self.schema(doc)
 
         # Set created date
-        doc.created_at = datetime.utcnow()
+        doc.created_at = datetime.utcnow().replace(tzinfo=timezone.utc)
 
         if self.requires_owner_insert:
             if not force and (owner is None and self.force_ownership):
@@ -530,7 +530,9 @@ class Collection(Generic[T]):
                 if self.is_updatable:
                     self.collection.document(id).set(
                         {
-                            "updated_at": datetime.utcnow(),
+                            "updated_at": datetime.utcnow().replace(
+                                tzinfo=timezone.utc
+                            ),
                             "updated_by": owner,
                             "deleted": True,
                         },
@@ -581,7 +583,9 @@ class Collection(Generic[T]):
                     write_batch.set(
                         reference=self.collection.document(doc_id),
                         document_data={
-                            "updated_at": datetime.utcnow(),
+                            "updated_at": datetime.utcnow().replace(
+                                tzinfo=timezone.utc
+                            ),
                             "updated_by": owner,
                             "deleted": True,
                         },
